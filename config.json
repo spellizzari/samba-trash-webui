@@ -1,0 +1,11 @@
+{
+    "serverPort": 1337,
+    "recycleBins": [
+        {
+            "name": "Recycle Bin",
+            "recycleFolderPaths": [
+                "Y:\\.recycle"
+            ]
+        }
+    ]
+}

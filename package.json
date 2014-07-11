@@ -1,0 +1,15 @@
+{
+  "name": "samba_trash_webui",
+  "version": "0.0.0",
+  "description": "samba-trash-webui",
+  "main": "app.js",
+  "author": {
+    "name": "Sebastien Pellizzari",
+    "email": ""
+  },
+  "dependencies": {
+    "async": "^0.9.0",
+    "express": "~4.5.1",
+    "walk": "^2.3.3"
+  }
+}
