@@ -60,17 +60,31 @@ class Configuration
 // Represents a recycled file
 class RecycleBinEntry
 {
+    public pbin: number;        // The index of the physical bin
+    public path: string;        // The entry path
     public name: string;        // The entry name
     public isFolder: boolean;   // Is it a folder?
     public fileSize: number;    // The file size (if it's a file)
     public extension: string;   // The file extension (if it's a file)
     public deletedDate: Date;   // The deletion date in server time
+    
+    // Constructor
+    constructor(pbin: number, root: string, stats: walk.Stats)
+    {
+        this.pbin = pbin;
+        this.name = stats.name;
+        this.path = path.join(root, this.name);
+        this.isFolder = stats.type == 'directory';
+        this.fileSize = stats.size;
+        this.extension = path.extname(this.name);
+        this.deletedDate = stats.atime;
+    }
 }
 
 // Represents a collection of entries
 class RecycleBinEntryCollection
 {
-    [path: string]: RecycleBinEntry;
+    [path: string]: RecycleBinEntry;    // Entries by path
 }
 
 // Represents the state of a recycle bin (physical or virtual)
@@ -84,6 +98,7 @@ enum RecycleBinState
 // Represents a physical recycle bin
 class PhysicalRecycleBin
 {
+    public id: number;                          // The ID of the physical recycle bin
     public state: RecycleBinState;              // The current recycle bin state
     public owner: VirtualRecycleBin;            // The owner recycle bin
     public entries: RecycleBinEntryCollection;  // The collection of entries in the recycle bin
@@ -91,11 +106,13 @@ class PhysicalRecycleBin
     public recycleDirBasePath: string;          // The path to the parent directory of recycleDirPath
 
     // Constructor
-    constructor(owner: VirtualRecycleBin, recycleDirPath: string)
+    constructor(id: number, owner: VirtualRecycleBin, recycleDirPath: string)
     {
+        this.id = id;
         this.owner = owner;
+        this.state = RecycleBinState.Normal;
         this.entries = new RecycleBinEntryCollection();
-        this.recycleDirPath = recycleDirPath;
+        this.recycleDirPath = path.normalize(recycleDirPath);
         this.recycleDirBasePath = path.basename(recycleDirPath);
     }
 
@@ -116,8 +133,33 @@ class PhysicalRecycleBin
             {
                 followLinks: false,
             });
-        walker.on('directories', (root, fileStatsArray, next) =>
+        walker.on('directories', (root, directoryStatsArray, next) =>
         {
+            // Alter the root.
+            root = path.relative(this.recycleDirPath, root);
+
+            // Add the directories as entries
+            for (var i = 0; i < directoryStatsArray.length; i++)
+            {
+                var stats = directoryStatsArray[i];
+                var entry = new RecycleBinEntry(this.id, root, stats);
+                this.entries[entry.path] = entry;
+            }
+            next();
+        });
+        walker.on('files', (root, fileStatsArray, next) =>
+        {
+            // Alter the root.
+            root = path.relative(this.recycleDirPath, root);
+
+            // Add the files as entries
+            for (var i = 0; i < fileStatsArray.length; i++)
+            {
+                var stats = fileStatsArray[i];
+                var entry = new RecycleBinEntry(this.id, root, stats);
+                this.entries[entry.path] = entry;
+            }
+            next();
         });
         walker.on('end', () =>
         {
@@ -139,13 +181,14 @@ class VirtualRecycleBin
     constructor(name: string)
     {
         this.name = name;
+        this.state = RecycleBinState.Normal;
         this.physicalRecycleBins = [];
     }
 
     // Adds a new physical recycle bin
     addPhysicalRecycleBin(path: string): PhysicalRecycleBin
     {
-        var physicalRecycleBin = new PhysicalRecycleBin(this, path);
+        var physicalRecycleBin = new PhysicalRecycleBin(this.physicalRecycleBins.length, this, path);
         this.physicalRecycleBins.push(physicalRecycleBin);
         return physicalRecycleBin;
     }
@@ -159,50 +202,19 @@ class VirtualRecycleBin
             return;
         }
 
-        // If we have physical recycle bins...
-        if (this.physicalRecycleBins.length > 0)
-        {
-            // Start scanning.
-            this.state = RecycleBinState.Scanning;
+        // Change state.
+        this.state = RecycleBinState.Scanning;
 
-            async.series(this.physicalRecycleBins,
-                (physicalRecycleBin, callback) =>
-                {
-                    physicalRecycleBin.scan(callback);
-                },
-                (error) =>
-                {
-                });
-
-            function endOfScan(err?: Error)
+        // Start scanning.
+        async.eachSeries(
+            this.physicalRecycleBins,
+            (physicalRecycleBin, callback) => physicalRecycleBin.scan(callback),
+            (err: Error) =>
             {
-                // In case of error, stop here and propagate.
-                if (err)
-                {
-                    This.state = RecycleBinState.Normal;
+                this.state = RecycleBinState.Normal;
+                if (callback)
                     callback(err);
-                    return;
-                }
-
-                // Process the next bin.
-                binIndex++;
-                if (binIndex < This.physicalRecycleBins.length)
-                    This.physicalRecycleBins[binIndex].scan(endOfScan);
-                else
-                {
-                    This.state = RecycleBinState.Normal;
-                    if (callback)
-                        callback();
-                }
-            }
-
-            this.physicalRecycleBins[0].startScan(endOfScan);
-        }
-        else
-        {
-            if (callback)
-                callback();
-        }
+            });
     }
 }
 
@@ -232,20 +244,12 @@ class RecycleBinManager
     }
 
     // Starts the manager
-    public start(callback?: (err?: string) => void): void
+    public start(callback?: (err?: Error) => void): void
     {
-        async.forEachSeries(this.virtualRecycleBins,
-            (virtualRecycleBin, callback) =>
-            {
-                virtualRecycleBin.scan((err) =>
-                {
-                    callback(err ? new Error(err) : null, null);
-                });
-            }, (error) =>
-            {
-                if (callback)
-                    callback(error ? error.message : null);
-            });
+        async.eachSeries(
+            this.virtualRecycleBins,
+            (virtualRecycleBin, callback) => virtualRecycleBin.scan(callback),
+            callback);
     }
 }
 
@@ -262,6 +266,9 @@ var config = Configuration.Load(configFilePath);
 // Create the recycle bin manager.
 var manager = new RecycleBinManager(config);
 
+// Start it.
+manager.start();
+
 // Create the Express app.
 var app = express();
 
@@ -273,10 +280,25 @@ app.get('/api/vbins', function (req, res)
     {
         var vbin = manager.virtualRecycleBins[i];
         var vbinResponse = <any>{};
+        vbinResponse.id = i;
         vbinResponse.name = vbin.name;
-        vbinResponse.state = vbin.state;
+        vbinResponse.state = RecycleBinState[vbin.state];
         response.push(vbinResponse);
     }
+    res.json(response);
+});
+app.get('/api/vbins/:id/pbins', function (req, res)
+{
+    var id = parseInt(req.params.id);
+    if (id == NaN || id < 0 || id >= manager.virtualRecycleBins.length)
+    {
+        res.send(500, 'invalid vbin id');
+        return;
+    }
+    var vbin = manager.virtualRecycleBins[req.params.id];
+    var response = [];
+    for (var i = 0; i < vbin.physicalRecycleBins.length; i++)
+        response.push(vbin.physicalRecycleBins[i].entries);
     res.json(response);
 });
 

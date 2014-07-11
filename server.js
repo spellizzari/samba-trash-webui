@@ -2,6 +2,7 @@
 
 var path = require('path');
 var walk = require('walk');
+var async = require('async');
 
 var express = require('express');
 
@@ -46,7 +47,15 @@ var Configuration = (function () {
 // ---- Worker Classes --------------------------------------------------------------------------------------------------------
 // Represents a recycled file
 var RecycleBinEntry = (function () {
-    function RecycleBinEntry() {
+    // Constructor
+    function RecycleBinEntry(pbin, root, stats) {
+        this.pbin = pbin;
+        this.name = stats.name;
+        this.path = path.join(root, this.name);
+        this.isFolder = stats.type == 'directory';
+        this.fileSize = stats.size;
+        this.extension = path.extname(this.name);
+        this.deletedDate = stats.atime;
     }
     return RecycleBinEntry;
 })();
@@ -69,18 +78,20 @@ var RecycleBinState;
 // Represents a physical recycle bin
 var PhysicalRecycleBin = (function () {
     // Constructor
-    function PhysicalRecycleBin(owner, recycleDirPath) {
+    function PhysicalRecycleBin(id, owner, recycleDirPath) {
+        this.id = id;
         this.owner = owner;
+        this.state = 0 /* Normal */;
         this.entries = new RecycleBinEntryCollection();
-        this.recycleDirPath = recycleDirPath;
+        this.recycleDirPath = path.normalize(recycleDirPath);
         this.recycleDirBasePath = path.basename(recycleDirPath);
     }
     // Starts scanning the recycle bin
-    PhysicalRecycleBin.prototype.startScan = function (callback) {
+    PhysicalRecycleBin.prototype.scan = function (callback) {
         var _this = this;
         if (this.state != 0 /* Normal */) {
             if (callback)
-                callback("Cannot start scanning a virtual recycle bin that is not in Normal state");
+                callback(Error("Cannot start scanning a virtual recycle bin that is not in Normal state"));
             return;
         }
 
@@ -91,7 +102,27 @@ var PhysicalRecycleBin = (function () {
         var walker = walk.walk(this.recycleDirPath, {
             followLinks: false
         });
-        walker.on('directories', function (root, fileStatsArray, next) {
+        walker.on('directories', function (root, directoryStatsArray, next) {
+            // Alter the root.
+            root = path.relative(_this.recycleDirPath, root);
+
+            for (var i = 0; i < directoryStatsArray.length; i++) {
+                var stats = directoryStatsArray[i];
+                var entry = new RecycleBinEntry(_this.id, root, stats);
+                _this.entries[entry.path] = entry;
+            }
+            next();
+        });
+        walker.on('files', function (root, fileStatsArray, next) {
+            // Alter the root.
+            root = path.relative(_this.recycleDirPath, root);
+
+            for (var i = 0; i < fileStatsArray.length; i++) {
+                var stats = fileStatsArray[i];
+                var entry = new RecycleBinEntry(_this.id, root, stats);
+                _this.entries[entry.path] = entry;
+            }
+            next();
         });
         walker.on('end', function () {
             _this.state = 0 /* Normal */;
@@ -107,55 +138,36 @@ var VirtualRecycleBin = (function () {
     // Constructor
     function VirtualRecycleBin(name) {
         this.name = name;
+        this.state = 0 /* Normal */;
         this.physicalRecycleBins = [];
     }
     // Adds a new physical recycle bin
     VirtualRecycleBin.prototype.addPhysicalRecycleBin = function (path) {
-        var physicalRecycleBin = new PhysicalRecycleBin(this, path);
+        var physicalRecycleBin = new PhysicalRecycleBin(this.physicalRecycleBins.length, this, path);
         this.physicalRecycleBins.push(physicalRecycleBin);
         return physicalRecycleBin;
     };
 
     // Starts scanning the physical recycle bins asynchronously to populate them
     VirtualRecycleBin.prototype.scan = function (callback) {
+        var _this = this;
         if (this.state != 0 /* Normal */) {
             if (callback)
-                callback("Cannot start scanning a virtual recycle bin that is not in Normal state");
+                callback(Error("Cannot start scanning a virtual recycle bin that is not in Normal state"));
             return;
         }
 
-        // If we have physical recycle bins...
-        if (this.physicalRecycleBins.length > 0) {
-            // Start scanning.
-            this.state = 1 /* Scanning */;
+        // Change state.
+        this.state = 1 /* Scanning */;
 
-            var This = this;
-            var binIndex = 0;
-
-            function endOfScan(err) {
-                // In case of error, stop here and propagate.
-                if (err) {
-                    This.state = 0 /* Normal */;
-                    callback(err);
-                    return;
-                }
-
-                // Process the next bin.
-                binIndex++;
-                if (binIndex < This.physicalRecycleBins.length)
-                    This.physicalRecycleBins[binIndex].startScan(endOfScan);
-                else {
-                    This.state = 0 /* Normal */;
-                    if (callback)
-                        callback();
-                }
-            }
-
-            this.physicalRecycleBins[0].startScan(endOfScan);
-        } else {
+        // Start scanning.
+        async.eachSeries(this.physicalRecycleBins, function (physicalRecycleBin, callback) {
+            return physicalRecycleBin.scan(callback);
+        }, function (err) {
+            _this.state = 0 /* Normal */;
             if (callback)
-                callback();
-        }
+                callback(err);
+        });
     };
     return VirtualRecycleBin;
 })();
@@ -180,8 +192,9 @@ var RecycleBinManager = (function () {
     }
     // Starts the manager
     RecycleBinManager.prototype.start = function (callback) {
-        for (var i = 0; i < this.virtualRecycleBins.length; i++)
-            this.virtualRecycleBins[i].startScan();
+        async.eachSeries(this.virtualRecycleBins, function (virtualRecycleBin, callback) {
+            return virtualRecycleBin.scan(callback);
+        }, callback);
     };
     return RecycleBinManager;
 })();
@@ -198,6 +211,9 @@ var config = Configuration.Load(configFilePath);
 // Create the recycle bin manager.
 var manager = new RecycleBinManager(config);
 
+// Start it.
+manager.start();
+
 // Create the Express app.
 var app = express();
 
@@ -207,10 +223,23 @@ app.get('/api/vbins', function (req, res) {
     for (var i = 0; i < manager.virtualRecycleBins.length; i++) {
         var vbin = manager.virtualRecycleBins[i];
         var vbinResponse = {};
+        vbinResponse.id = i;
         vbinResponse.name = vbin.name;
-        vbinResponse.state = vbin.state;
+        vbinResponse.state = RecycleBinState[vbin.state];
         response.push(vbinResponse);
     }
+    res.json(response);
+});
+app.get('/api/vbins/:id/pbins', function (req, res) {
+    var id = parseInt(req.params.id);
+    if (id == NaN || id < 0 || id >= manager.virtualRecycleBins.length) {
+        res.send(500, 'invalid vbin id');
+        return;
+    }
+    var vbin = manager.virtualRecycleBins[req.params.id];
+    var response = [];
+    for (var i = 0; i < vbin.physicalRecycleBins.length; i++)
+        response.push(vbin.physicalRecycleBins[i].entries);
     res.json(response);
 });
 

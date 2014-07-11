@@ -6,97 +6,63 @@
 
 declare module "async"
 {
-    import events = require('events');
+    export function each<T, E>(arr: T[], iterator: (item: T, callback: (err?: E) => void) => void, callback: (err?: E) => void): void;
+    export function eachSeries<T, E>(arr: T[], iterator: (item: T, callback: (err?: E) => void) => void, callback: (err?: E) => void): void;
+    export function eachLimit<T, E>(arr: T[], limit: number, iterator: (item: T, callback: (err?: E) => void) => void, callback: (err?: E) => void): void;
 
-    // Callbacks
+    export function map<I, O, E>(arr: I[], iterator: (item: I, callback: (err: E, transformed: O) => void) => void, callback: (err: E, results: O[]) => void): void;
+    export function mapSeries<I, O, E>(arr: I[], iterator: (item: I, callback: (err: E, transformed: O) => void) => void, callback: (err: E, results: O[]) => void): void;
+    export function mapLimit<I, O, E>(arr: I[], limit: number, iterator: (item: I, callback: (err: E, transformed: O) => void) => void, callback: (err: E, results: O[]) => void): void;
 
-    export interface Callback<E> { (err?: E): void; }
-    export interface FilterCallback { (truthValue: boolean): void; }
-    export interface SortCallback<E> { (err: E, sortValue: any): void; }
-    export interface ResultCallback<T, E> { (err: E, result: T): void; }
-    export interface ReduceCallback<T, E> { (err: E, reduction: T): void; }
-    export interface WaterfallCallback<E> { (err: E, ...args: any[]): void; }
-    export interface ResultsCallback<T, E> { (err: E, results: T[]): void; }
-    export interface ResultOnlyCallback<T> { (result: T): void; }
-    export interface ResultsOnlyCallback<T> { (results: T[]): void; }
-    export interface TransformCallback<T, E> { (err: E, transformed: T): void; }
+    export function filter<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (results: T[]) => void): void;
+    export function filterSeries<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (results: T[]) => void): void;
     
-    // Iterators
+    export function select<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (results: T[]) => void): void;
+    export function selectSeries<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (results: T[]) => void): void;
 
-    export interface Iterator<T, E> { (item: T, callback: Callback<E>): void; }
-    export interface FilterIterator<T> { (item: T, callback: FilterCallback): void; }
-    export interface SortIterator<T, E> { (item: T, callback: SortCallback<E>): void; }
-    export interface ConcatIterator<T, E> { (item: T, callback: ResultsCallback<T, E>): void; }
-    export interface ReduceInterator<T, M, E> { (memo: M, item: T, callback: ReduceCallback<M, E>): void; }
-    export interface TransformIterator<I, O, E> { (item: I, callback: TransformCallback<O, E>): void; }
+    export function reject<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (results: T[]) => void): void;
+    export function rejectSeries<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (results: T[]) => void): void;
 
-    // Other Functions
+    export function reduce<T, M, E>(arr: T[], memo: M, iterator: (memo: M, item: T, callback: (err: E, reduction: M) => void) => void, callback: (err: E, result: M) => void): void;
+    export function reduceRight<T, M, E>(arr: T[], memo: M, iterator: (memo: M, item: T, callback: (err: E, reduction: M) => void) => void, callback: (err: E, result: M) => void): void;
 
-    export interface Action { (): void; }
-    export interface Task<T, E> { (callback: ResultCallback<T, E>): void; }
-    export interface TestFunction { (): boolean; }
-    export interface IteratorFunction { (): Action; }
-    export interface ActionFunction<E> { (callback: Callback<E>): void; }
-    export interface RetryFunction<T, E> { (callback: ResultsCallback<T, E>, results: T[]): void; }
-    export interface TimesFunction<T, E> { (n: number, callback: ResultCallback<T, E>): void; }
-    export interface WorkerFunction<T, E> { (task: T, callback: Callback<E>): void; }
-    export interface MemoizeFunction<I, O, E> { (name: I, callback: ResultCallback<O, E>): void; }
-    export interface MemoizeHashFunction<I> { (name: I): any; }
+    export function detect<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (result: T) => void): void;
+    export function detectSeries<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (result: T) => void): void;
 
-    // Collections
+    export function sortBy<T, E>(arr: T[], iterator: (item: T, callback: (err: E, sortValue: any) => void) => void, callback: (err: E, results: T[]) => void): void;
 
-    export function each<T, E>(arr: T[], iterator: Iterator<T, E>, callback: Callback<E>): void;
-    export function eachSeries<T, E>(arr: T[], iterator: Iterator<T, E>, callback: Callback<E>): void;
-    export function eachLimit<T, E>(arr: T[], limit: number, iterator: Iterator<T, E>, callback: Callback<E>): void;
+    export function some<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (result: boolean) => void): void;
+    export function any<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (result: boolean) => void): void;
 
-    export function map<I, O, E>(arr: I[], iterator: TransformIterator<I, O, E>, callback: ResultsCallback<O, E>): void;
-    export function mapSeries<I, O, E>(arr: I[], iterator: TransformIterator<I, O, E>, callback: ResultsCallback<O, E>): void;
-    export function mapLimit<I, O, E>(arr: I[], limit: number, iterator: TransformIterator<I, O, E>, callback: ResultsCallback<O, E>): void;
+    export function every<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (result: boolean) => void): void;
+    export function all<T>(arr: T[], iterator: (item: T, callback: (truthValue: boolean) => void) => void, callback: (result: boolean) => void): void;
 
-    export function filter<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultsOnlyCallback<T>): void;
-    export function filterSeries<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultsOnlyCallback<T>): void;
+    export function concat<I, O, E>(arr: I[], iterator: (item: I, callback: (err: E, results: O[]) => void) => void, callback: (err: E, results: O[]) => void): void;
+    export function concat<I, E>(arr: I[], iterator: (item: I, callback: (err: E, results: any) => void) => void, callback: (err: E, results: any) => void): void;
+    export function concatSeries<I, O, E>(arr: I[], iterator: (item: I, callback: (err: E, results: O[]) => void) => void, callback: (err: E, results: O[]) => void): void;
+    export function concatSeries<I, E>(arr: I[], iterator: (item: I, callback: (err: E, results: any) => void) => void, callback: (err: E, results: any) => void): void;
+
+    export function series<T, E>(tasks: { (callback: (err: E, result: T) => void): void; }[], callback?: (err: E, results: T[]) => void): void;
+    export function series<T, E>(tasks: any, callback?: (err: E, results: T[]) => void): void;
+    export function series<E>(tasks: any, callback?: (err: E, results: any[]) => void): void;
+
+    export function parallel<T, E>(tasks: { (callback: (err: E, result: T) => void): void; }[], callback?: (err: E, results: T[]) => void): void;
+    export function parallel<T, E>(tasks: any, callback?: (err: E, results: T[]) => void): void;
+    export function parallel<E>(tasks: any, callback?: (err: E, results: any[]) => void): void;
     
-    export function select<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultsOnlyCallback<T>): void;
-    export function selectSeries<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultsOnlyCallback<T>): void;
+    export function parallelLimit<T, E>(tasks: { (callback: (err: E, result: T) => void): void; }[], limit: number, callback?: (err: E, results: T[]) => void): void;
+    export function parallelLimit<T, E>(tasks: any, limit: number, callback?: (err: E, results: T[]) => void): void;
+    export function parallelLimit<E>(tasks: any, limit: number, callback?: (err: E, results: any[]) => void): void;
 
-    export function reject<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultsOnlyCallback<T>): void;
-    export function rejectSeries<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultsOnlyCallback<T>): void;
+    export function whilst<E>(test: () => boolean, fn: (callback: (err?: E) => void) => void, callback: (err?: E) => void): void;
+    export function doWhilst<E>(test: () => boolean, fn: (callback: (err?: E) => void) => void, callback: (err?: E) => void): void;
 
-    export function reduce<T, M, E>(arr: T[], memo: M, iterator: ReduceInterator<T, M, E>, callback: ResultCallback<M, E>): void;
-    export function reduceRight<T, M, E>(arr: T[], memo: M, iterator: ReduceInterator<T, M, E>, callback: ResultCallback<M, E>): void;
+    export function until<E>(test: () => boolean, fn: (callback: (err?: E) => void) => void, callback: (err?: E) => void): void;
+    export function doUntil<E>(test: () => boolean, fn: (callback: (err?: E) => void) => void, callback: (err?: E) => void): void;
 
-    export function detect<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultOnlyCallback<T>): void;
-    export function detectSeries<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultOnlyCallback<T>): void;
+    export function forever<E>(fn: (callback: (err?: E) => void) => void, errback: (err?: E) => void): void;
 
-    export function sortBy<T, E>(arr: T[], iterator: SortIterator<T, E>, callback: ResultsCallback<T, E>): void;
-
-    export function some<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultOnlyCallback<boolean>): void;
-    export function any<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultOnlyCallback<boolean>): void;
-
-    export function every<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultOnlyCallback<boolean>): void;
-    export function all<T>(arr: T[], iterator: FilterIterator<T>, callback: ResultOnlyCallback<boolean>): void;
-
-    export function concat<T, E>(arr: T[], iterator: ConcatIterator<T, E>, callback: ResultsCallback<T, E>): void;
-    export function concatSeries<T, E>(arr: T[], iterator: ConcatIterator<T, E>, callback: ResultsCallback<T, E>): void;
-
-    export function series<T, E>(tasks: Task<T, E>[], callback?: ResultsCallback<T, E>): void;
-    export function series<T, E>(tasks: any, callback?: ResultsCallback<T, E>): void;
-
-    export function parallel<T, E>(tasks: Task<T, E>[], callback?: ResultsCallback<T, E>): void;
-    export function parallel<T, E>(tasks: any, callback?: ResultsCallback<T, E>): void;
-    
-    export function parallelLimit<T, E>(tasks: Task<T, E>[], limit: number, callback?: ResultsCallback<T, E>): void;
-    export function parallelLimit<T, E>(tasks: any, limit: number, callback?: ResultsCallback<T, E>): void;
-
-    export function whilst<E>(test: TestFunction, fn: ActionFunction<E>, callback: Callback<E>): void;
-    export function doWhilst<E>(test: TestFunction, fn: ActionFunction<E>, callback: Callback<E>): void;
-
-    export function until<E>(test: TestFunction, fn: ActionFunction<E>, callback: Callback<E>): void;
-    export function doUntil<E>(test: TestFunction, fn: ActionFunction<E>, callback: Callback<E>): void;
-
-    export function forever<E>(fn: ActionFunction<E>, errback: Callback<E>): void;
-
-    export function waterfall<T, E>(tasks: Function[], callback?: ResultCallback<T, E>): void;
+    export function waterfall<T, E>(tasks: Function[], callback?: (err: E, result: T) => void): void;
 
     export function compose(...fns: Function[]): Function;
     export function seq(...fns: Function[]): Function;
@@ -106,11 +72,11 @@ declare module "async"
 
     export interface BaseQueue<T, E>
     {
-        drain: Action;
-        empty: Action;
+        drain: () => void;
+        empty: () => void;
         paused: boolean;
         started: boolean;
-        saturated: Action;
+        saturated: () => void;
         concurrency: number;
         kill(): void;
         idle(): boolean;
@@ -122,49 +88,49 @@ declare module "async"
 
     export interface Queue<T, E> extends BaseQueue<T, E>
     {
-        push(task: T, callback?: Callback<E>): void;
-        push(tasks: T[], callbacks?: Callback<E>[]): void;
-        unshift(task: T, callback?: Callback<E>): void;
+        push(task: T, callback?: (err?: E) => void): void;
+        push(tasks: T[], callbacks?: { (err?: E): void; }[]): void;
+        unshift(task: T, callback?: (err?: E) => void): void;
     }
 
     export interface PriorityQueue<T, E> extends BaseQueue<T, E>
     {
-        push(task: T, priority: number, callback?: Callback<E>): void;
-        push(tasks: T[], priority: number, callbacks?: Callback<E>[]): void;
+        push(task: T, priority: number, callback?: (err?: E) => void): void;
+        push(tasks: T[], priority: number, callbacks?: { (err?: E): void; }[]): void;
     }
 
-    export function queue<T, E>(worker: WorkerFunction<T, E>, concurrency: number): Queue<T, E>;
-    export function priorityQueue<T, E>(worker: WorkerFunction<T, E>, concurrency: number): PriorityQueue<T, E>;
+    export function queue<T, E>(worker: (task: T, callback: (err?: E) => void) => void, concurrency: number): Queue<T, E>;
+    export function priorityQueue<T, E>(worker: (task: T, callback: (err?: E) => void) => void, concurrency: number): PriorityQueue<T, E>;
 
     export interface Cargo<T, E>
     {
-        empty: Action;
-        drain: Action;
+        empty: () => void;
+        drain: () => void;
         payload: number;
-        saturated: Action;
+        saturated: () => void;
         length(): number;
-        push(task: T, callback?: Callback<E>): void;
-        push(task: T[], callback?: Callback<E>[]): void;
+        push(task: T, callback?: (err?: E) => void): void;
+        push(task: T[], callback?: (err?: E) => void[]): void;
     }
 
-    export function cargo<T, E>(worker: WorkerFunction<T, E>, payload?: number): Cargo<T, E>;
+    export function cargo<T, E>(worker: (task: T, callback: (err?: E) => void) => void, payload?: number): Cargo<T, E>;
 
-    export function auto<T, E>(tasks: Object, callback?: ResultsCallback<T, E>): void;
+    export function auto<T, E>(tasks: Object, callback?: (err: E, results: T[]) => void): void;
 
-    export function retry<T, E>(task: RetryFunction<T, E>, callback?: ResultsCallback<T, E>): void;
-    export function retry<T, E>(times: number, task: RetryFunction<T, E>, callback?: ResultsCallback<T, E>): void;
+    export function retry<T, E>(task: (callback: (err: E, results: T[]) => void, results: T[]) => void, callback?: (err: E, results: T[]) => void): void;
+    export function retry<T, E>(times: number, task: (callback: (err: E, results: T[]) => void, results: T[]) => void, callback?: (err: E, results: T[]) => void): void;
 
-    export function iterator(tasks: Action[]): IteratorFunction;
+    export function iterator(tasks: { (): void; }[]): () => () => void;
 
-    export function apply<T, E>(func: Function, ...args: any[]): Task<T, E>;
+    export function apply<T, E>(func: Function, ...args: any[]): (callback: (err: E, result: T) => void) => void;
 
-    export function nextTick(callback: Action): void;
+    export function nextTick(callback: () => void): void;
 
-    export function times<T, E>(n: number, fn: TimesFunction<T, E>, callback: ResultsCallback<T, E>): void;
-    export function timesSeries<T, E>(n: number, fn: TimesFunction<T, E>, callback: ResultsCallback<T, E>): void;
+    export function times<T, E>(n: number, fn: (n: number, callback: (err: E, result: T) => void) => void, callback: (err: E, results: T[]) => void): void;
+    export function timesSeries<T, E>(n: number, fn: (n: number, callback: (err: E, result: T) => void) => void, callback: (err: E, results: T[]) => void): void;
 
     export function memoize<F>(fn: F): F;
-    export function memoize<I, O, E>(fn: MemoizeFunction<I, O, E>, haser?: MemoizeHashFunction<I>): MemoizeFunction<I, O, E>;
+    export function memoize<I, O, E>(fn: (name: I, callback: (err: E, result: O) => void) => void, hasher?: (name: I) => any): (name: I, callback: (err: E, result: O) => void) => void;
 
     export function unmemoize(fn: Function): void;
 

@@ -6,9 +6,10 @@
 
 declare module "walk"
 {
+    import fs = require('fs');
     import events = require('events');
 
-    export interface Stats
+    export interface Stats extends fs.Stats
     {
         type: string;
         name: string;
@@ -58,8 +59,6 @@ declare module "walk"
 
     export class Walker extends events.EventEmitter
     {
-        on(event: string, listener: Function): events.EventEmitter;
-
         on(event: 'end', listener: () => void): events.EventEmitter;
         on(event: 'names', listener: (root: string, nodeNamesArray: string[]) => void): events.EventEmitter;
 
@@ -90,6 +89,8 @@ declare module "walk"
 
         on(event: 'characterDevice', listener: (root: string, stats: Stats, next: () => void) => void): events.EventEmitter;
         on(event: 'characterDevices', listener: (root: string, statsArray: Stats[], next: () => void) => void): events.EventEmitter;
+
+        on(event: string, listener: any): events.EventEmitter;
 
         pause(): void;
         resume(): void;
